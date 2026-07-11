@@ -1,4 +1,4 @@
-const CACHE_NAME = 'KLAP DEGI USB';
+const CACHE_NAME = 'KLAP ANA USB';
 const urlsToCache = [
   '/',
   '/index.html',
