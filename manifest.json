@@ -2,7 +2,7 @@
   "name": "KLAP_ANA_USB_V2",
   "short_name": "KLAP_ANA_USB_V2",
   "description": "BLEとGPSに対応したラップタイマーアプリです。",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "fullscreen",
   "orientation": "landscape",
   "background_color": "#000000",
