@@ -3,7 +3,7 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/g_usb2.html',
-  '/g_usb2w.html',
+  '/g_usbw.html',
   '/manifest.json',
   '/service-worker.js',
   '/192.png',
