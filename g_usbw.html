@@ -506,8 +506,6 @@ function parseNMEA(line) {
     // --- GGA: 座標と精密時刻(V12)の取得 ---
     if (line.includes('GGA') && (p[6] !== '0' && p[6] !== '')) {
         fix = true;
-        
-        // V12修正: Date.now()を廃止し、NMEA内のUTC時刻を使用
         const gpsTime = parseNmeaTime(p[1]);
 
         const cur = { 
@@ -518,47 +516,50 @@ function parseNMEA(line) {
             time: gpsTime 
         };
 
-        if (swState === 1 && lastPos) {
+        // タイマー動作中（swState === 1）なら 1点目から無条件で配列へ保存
+        if (swState === 1) {
             gpsPoints.push(cur);
 
-            // V12補間ロジックによる交差判定
-            const hitSL = getIntersection(lastPos, cur, lines.startLine);
-            if (hitSL) {
-                if (validDirection === null) validDirection = hitSL.dir;
-                
-                // クールダウン判定も精密化された時刻(hitSL.time)で行う
-                const currentLapTime = hitSL.time - (lapStartTime || startTime);
-                if (hitSL.dir === validDirection && (currentLapTime > cooldownMs)) {
-                    processLap(hitSL.time);
+            // ライン判定（コントロールライン・セクター）は2点目以降（lastPosが存在するとき）のみ行う
+            if (lastPos) {
+                // コントロールライン判定
+                const hitSL = getIntersection(lastPos, cur, lines.startLine);
+                if (hitSL) {
+                    if (validDirection === null) validDirection = hitSL.dir;
+                    const currentLapTime = hitSL.time - (lapStartTime || startTime);
+                    if (hitSL.dir === validDirection && (currentLapTime > cooldownMs)) {
+                        processLap(hitSL.time);
+                    }
                 }
-            }
 
-            // セクター判定 (ここもhitSL.timeを使用することでV12化)
-            if (lapStartTime > 0) {
-                ['s1', 's2', 's3'].forEach(s => {
-                    const hit = getIntersection(lastPos, cur, lines[s + 'Line']);
-                    if (hit) {
-                        if (sectorDirections[s] === null) sectorDirections[s] = hit.dir;
-                        if (hit.dir === sectorDirections[s]) {
-                            // V12補正済みの時間でセクタータイムを計算
-                            const absTime = (hit.time - lapStartTime) / 1000;
-                            if (s === 's1' && s1_abs === 0) {
-                                s1_abs = absTime; lastPassedSectorTime = absTime;
-                                document.getElementById('s1_val').textContent = s1_abs.toFixed(3);
-                            } else if (s === 's2' && s2_abs === 0) {
-                                s2_abs = absTime; lastPassedSectorTime = absTime;
-                                document.getElementById('s2_val').textContent = (s1_abs > 0 ? (s2_abs - s1_abs) : s2_abs).toFixed(3);
-                            } else if (s === 's3' && s3_abs === 0) {
-                                s3_abs = absTime; lastPassedSectorTime = absTime;
-                                document.getElementById('s3_val').textContent = (s2_abs > 0 ? (s3_abs - s2_abs) : s3_abs).toFixed(3);
+                // セクター判定
+                if (lapStartTime > 0) {
+                    ['s1', 's2', 's3'].forEach(s => {
+                        const hit = getIntersection(lastPos, cur, lines[s + 'Line']);
+                        if (hit) {
+                            if (sectorDirections[s] === null) sectorDirections[s] = hit.dir;
+                            if (hit.dir === sectorDirections[s]) {
+                                const absTime = (hit.time - lapStartTime) / 1000;
+                                if (s === 's1' && s1_abs === 0) {
+                                    s1_abs = absTime; lastPassedSectorTime = absTime;
+                                    document.getElementById('s1_val').textContent = s1_abs.toFixed(3);
+                                } else if (s === 's2' && s2_abs === 0) {
+                                    s2_abs = absTime; lastPassedSectorTime = absTime;
+                                    document.getElementById('s2_val').textContent = (s1_abs > 0 ? (s2_abs - s1_abs) : s2_abs).toFixed(3);
+                                } else if (s === 's3' && s3_abs === 0) {
+                                    s3_abs = absTime; lastPassedSectorTime = absTime;
+                                    document.getElementById('s3_val').textContent = (s2_abs > 0 ? (s3_abs - s2_abs) : s3_abs).toFixed(3);
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             }
         }
-        lastPos = cur;
+        lastPos = cur; // 次のポイントのために位置を保持
     }
+
+    // GPSボタンのLED表示制御
     btn.style.background = fix ? "var(--hrc-red)" : "var(--hrc-orange)";
     btn.style.color = fix ? "#fff" : "#000";
 }
@@ -749,8 +750,22 @@ document.getElementById('lapBtn').onclick = function() {
 };
 
 document.getElementById('startBtn').onclick = function() {
-    if (swState !== 1) { swState = 1; startTime = Date.now(); lapStartTime = 0; lapRecords = []; gpsPoints = []; validDirection = null; this.classList.add('active'); document.getElementById('gpxBtn').style.display = 'none'; }
-    else { swState = 2; this.classList.remove('active'); document.getElementById('gpxBtn').style.display = 'block'; }
+    if (swState !== 1) { 
+        swState = 1; 
+        startTime = Date.now(); 
+        lapStartTime = 0; 
+        lapRecords = []; 
+        gpsPoints = []; 
+        lastPos = null; // ★ここを追加（前回の位置情報を破棄）
+        validDirection = null; 
+        this.classList.add('active'); 
+        document.getElementById('gpxBtn').style.display = 'none'; 
+    }
+    else { 
+        swState = 2; 
+        this.classList.remove('active'); 
+        document.getElementById('gpxBtn').style.display = 'block'; 
+    }
 };
 
 let isUsbLoopRunning = false;
