@@ -1,68 +1,57 @@
-const CACHE_NAME = 'KLAP ANA USB';
+const CACHE_NAME = 'KLAP-ANA-USB-v1';
+
+// アプリ本体の自ドメイン内静的ファイルのみキャッシュ
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/g_usb2.html',
-  '/g_usbw.html',
-  '/manifest.json',
-  '/service-worker.js',
-  '/192.png',
-  '/512.png',
-  // 画像やJavaScriptファイルなど、アプリを構成するすべての静的ファイルをここに追加
-  '/circuit_data.js', // 設定ツールで使われるファイル
-  // その他のCSSやJSファイルなど
-
-'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js',
-  'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css',
-  'https://cdn.jsdelivr.net/npm/chart.js'
-
-
-
-
-
-  
+  './',
+  './index.html',
+  './g_usb2.html',
+  './g_usbw.html',
+  './manifest.json',
+  './192.png',
+  './512.png',
+  './circuit_data.js'
 ];
 
-// インストールイベント: キャッシュにファイルを保存
+// インストールイベント
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('Opened cache');
+      return cache.addAll(urlsToCache);
+    })
   );
+  self.skipWaiting();
 });
 
-// フェッチイベント: キャッシュからリソースを返す
+// フェッチイベント
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // キャッシュにリソースがあればそれを返す
-        if (response) {
-          return response;
-        }
-        // なければネットワークから取得する
-        return fetch(event.request);
-      })
+    caches.match(event.request).then((response) => {
+      if (response) {
+        return response;
+      }
+      return fetch(event.request).catch(() => {
+        // オフライン時のエラーハンドリング（必要に応じて）
+      });
+    })
   );
 });
 
-// アクティベートイベント: 古いキャッシュを削除
+// アクティベートイベント（古いキャッシュの削除）
 self.addEventListener('activate', (event) => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
+          if (!cacheWhitelist.includes(cacheName)) {
             return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
+});
 
 });
 
